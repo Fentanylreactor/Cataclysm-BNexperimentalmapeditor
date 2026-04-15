@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+        <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CBN Multi-Tile Map Editor (Enhanced)</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -350,11 +352,14 @@
     </div>
         
         <div id="quick-add-panel" class="hidden mt-2 p-2 bg-gray-900 rounded border border-gray-600 space-y-2 shadow-xl">
+            <input type="text" id="quick-add-search" placeholder="Search groups or items..." 
+        class="w-full p-1 rounded bg-blue-900 border border-blue-600 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500">
     <label class="block text-[10px] text-gray-400 uppercase font-bold">Select Preset</label>
     <select id="quick-add-select" class="w-full bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600 focus:border-blue-400 outline-none">
     </select>
+    
 
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-2 gap-2 mt-2">
         <div>
             <label class="block text-[10px] text-gray-400">X (or [min,max])</label>
             <input type="text" id="quick-add-x" class="w-full bg-gray-800 text-white text-xs rounded px-1 py-1 font-mono border border-gray-600">
@@ -375,10 +380,28 @@
             <input type="text" id="quick-add-repeat" class="w-full bg-gray-800 text-white text-xs rounded px-1 py-1 font-mono border border-gray-600">
         </div>
     </div>
-
+    
+   <div id="purple-item-contents" class="mt-2 mb-2 p-2 bg-purple-900 rounded border border-purple-600 text-xs text-purple-200 hidden max-h-40 overflow-y-auto"></div>
     <button id="quick-add-confirm" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded px-2 py-2 mt-1 shadow-md transition-colors">
         ADD SPAWN
     </button>
+</div>
+
+<div class="p-3 bg-purple-700 rounded-lg shadow-inner mt-2">
+    <h3 class="text-md font-semibold text-white border-b border-purple-500 pb-1">Item Placements (`place_items`)</h3>
+    
+    
+    
+    <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+        <select id="item-preset-select" class="w-full p-1 rounded bg-blue-800 ...">
+        <input type="text" id="place-item-group-input" class="col-span-2 p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="item_group">
+        <input type="text" id="place-item-x-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="X Coord(s) (e.g., 3 or [2,5])">
+        <input type="text" id="place-item-y-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="Y Coord(s) (e.g., 16 or [14,16])">
+        <input type="number" id="place-item-chance-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="Chance (e.g., 50)">
+        <input type="text" id="place-item-repeat-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="Repeat (2 or [1,3])">
+    </div>
+    <button id="add-place-item-btn" class="mt-2 w-full compact-btn bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg shadow-md transition duration-200">Add Item Placement</button>
+    <div id="place-items-list" class="mt-3 max-h-32 overflow-y-auto"></div>
 </div>
 
                     <div class="p-3 bg-gray-700 rounded-lg shadow-inner">
@@ -484,8 +507,8 @@
                                 <option value="">-- Load Preset (Optional) --</option>
                             </select>
                         </div>
-                        <div id="item-group-contents" class="hidden mb-2 p-2 bg-blue-900 border border-blue-600 rounded text-[10px] text-blue-200 max-h-32 overflow-y-auto font-mono">
-    </div>
+                        
+    
                         <div class="grid grid-cols-3 gap-2 mt-3 text-sm">
                             <input type="text" id="monster-symbol-input" class="p-1 rounded bg-green-800 border border-green-600 text-gray-100 text-center font-mono" placeholder="Symbol">
                             <input type="text" id="monster-id-input" class="col-span-2 p-1 rounded bg-green-800 border border-green-600 text-gray-100 font-mono text-xs" placeholder="mon_zombie">
@@ -498,9 +521,13 @@
                     <div class="p-3 bg-blue-700 rounded-lg shadow-inner">
                         <h3 class="text-md font-semibold text-white border-b border-blue-500 pb-1">Item Spawns (`items`)</h3>
                         <div class="mb-2">
-                             <select id="item-preset-select" class="w-full p-1 rounded bg-blue-800 border border-blue-600 text-gray-100 text-xs">
-                                <option value="">-- Load Preset (Optional) --</option>
-                            </select>
+                             <div class="mb-2 px-1">
+    <input type="text" id="item-group-search" placeholder="Search groups or items..." 
+        class="w-full p-1 rounded bg-blue-900 border border-blue-600 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500">
+</div>
+<select id="item-preset-select" class="w-full p-1 rounded bg-blue-800 ...">
+    <option value="">-- Load Preset (Optional) --</option>
+</select> 
                         </div>
                         <div class="grid grid-cols-3 gap-2 mt-3 text-sm">
                             <input type="text" id="item-symbol-input" class="p-1 rounded bg-blue-800 border border-blue-600 text-gray-100 text-center font-mono" placeholder="Symbol">
@@ -512,18 +539,7 @@
                         <div id="item-spawn-list" class="mt-3 max-h-32 overflow-y-auto"></div>
                     </div>
 
-                    <div class="p-3 bg-purple-700 rounded-lg shadow-inner">
-                        <h3 class="text-md font-semibold text-white border-b border-purple-500 pb-1">Item Placements (`place_items`)</h3>
-                        <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
-                            <input type="text" id="place-item-group-input" class="col-span-2 p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="item_group">
-                            <input type="text" id="place-item-x-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="X Coord(s) (e.g., 3 or [2,5])">
-                            <input type="text" id="place-item-y-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="Y Coord(s) (e.g., 16 or [14,16])">
-                            <input type="number" id="place-item-chance-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="Chance (e.g., 50)">
-                            <input type="text" id="place-item-repeat-input" class="p-1 rounded bg-purple-800 border border-purple-600 text-gray-100 font-mono text-xs" placeholder="Repeat (2 or [1,3])">
-                        </div>
-                        <button id="add-place-item-btn" class="mt-2 w-full compact-btn bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg shadow-md transition duration-200">Add Item Placement</button>
-                        <div id="place-items-list" class="mt-3 max-h-32 overflow-y-auto"></div>
-                    </div>
+                    
                 </div>
             </div>
 
@@ -612,59 +628,62 @@
                    
                    
         <div id="floating-palette">
-            <div class="flex items-center justify-between pb-1 mb-2 border-b border-gray-700">
-                <h3 class="text-xs font-semibold text-gray-200">Brushes</h3>
-                <button id="toggle-palette-btn" class="text-sm text-gray-400 hover:text-white transition duration-150 p-1 rounded-full bg-gray-600 leading-none">&lt;</button>
-            </div>
-            <div class="mb-2 px-1">
-    <input type="text" id="palette-search" placeholder="Search brushes..." 
-        class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500">
-</div>
-            <div id="palette-inner-scroller" class="w-full h-full">
-                <div id="palette" class="grid"></div>
-                <input type="color" id="brush-color-picker" style="visibility:hidden; position:absolute; top:0; left:0;">
-                <div class="p-3 bg-gray-700 rounded-lg shadow-inner mt-4">
-                    <h3 class="text-md font-semibold mb-3 text-yellow-300 border-b border-gray-600 pb-1">Tool Settings</h3>
-                    <div class="mb-3">
-                        <h3 class="text-sm font-semibold mb-2 text-gray-300">Brush Size</h3>
-                        <div class="flex items-center space-x-2">
-                            <label class="w-1/3 text-sm font-medium">Brush Size (NxN):</label>
-                            <div class="flex items-center flex-1 space-x-1">
-                                <span id="brush-size-display" class="w-8 text-center text-sm font-bold">1</span>
-                                <button id="brush-size-up" class="p-1 border border-gray-600 rounded bg-gray-600 hover:bg-gray-500 text-sm leading-none flex items-center justify-center">&uarr;</button>
-                                <button id="brush-size-down" class="p-1 border border-gray-600 rounded bg-gray-600 hover:bg-gray-500 text-sm leading-none flex items-center justify-center">&darr;</button>
-                                <input type="hidden" id="brush-width-input" value="1">
-                                <input type="hidden" id="brush-height-input" value="1">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-3 border-t border-gray-600">
-                        <h3 class="text-sm font-semibold mb-2 text-gray-300">Symmetry Mode</h3>
-                        <div class="flex flex-col items-start space-y-2">
-                            <label class="flex items-center text-gray-300">
-                                <input type="checkbox" id="v-symmetry-checkbox" class="h-4 w-4 text-yellow-500 rounded border-gray-500 focus:ring-yellow-500">
-                                <span class="ml-2 text-sm">Vertical (Mirror Y)</span>
-                            </label>
-                            <label class="flex items-center text-gray-300">
-                                <input type="checkbox" id="h-symmetry-checkbox" class="h-4 w-4 text-yellow-500 rounded border-gray-500 focus:ring-yellow-500">
-                                <span class="ml-2 text-sm">Horizontal (Mirror X)</span>
-                            </label>
-                        </div>
+    <div class="flex items-center justify-between pb-1 mb-2 border-b border-gray-700">
+        <h3 class="text-xs font-semibold text-gray-200">Palette & Tools</h3>
+        <button id="toggle-palette-btn" class="text-sm text-gray-400 hover:text-white transition duration-150 p-1 rounded-full bg-gray-600 leading-none">&lt;</button>
+    </div>
+
+    <div id="palette-inner-scroller" class="w-full h-full flex flex-col">
+        
+        <div class="p-3 bg-gray-700 rounded-lg shadow-inner mb-4">
+            <h3 class="text-md font-semibold mb-3 text-yellow-300 border-b border-gray-600 pb-1">Tool Settings</h3>
+            <div class="mb-3">
+                <h3 class="text-sm font-semibold mb-2 text-gray-300">Brush Size</h3>
+                <div class="flex items-center space-x-2">
+                    <label class="w-1/3 text-sm font-medium">Brush Size (NxN):</label>
+                    <div class="flex items-center flex-1 space-x-1">
+                        <span id="brush-size-display" class="w-8 text-center text-sm font-bold">1</span>
+                        <button id="brush-size-up" class="p-1 border border-gray-600 rounded bg-gray-600 hover:bg-gray-500 text-sm leading-none flex items-center justify-center">&uarr;</button>
+                        <button id="brush-size-down" class="p-1 border border-gray-600 rounded bg-gray-600 hover:bg-gray-500 text-sm leading-none flex items-center justify-center">&darr;</button>
+                        <input type="hidden" id="brush-width-input" value="1">
+                        <input type="hidden" id="brush-height-input" value="1">
                     </div>
                 </div>
-                <div class="mt-4">
-                    <h3 class="text-lg font-semibold mb-3 text-gray-200 border-b border-gray-700 pb-1">Add Custom Brush</h3>
-                    <div class="flex flex-col gap-2">
-                        <label for="add-brush-symbol-input" class="block text-sm font-medium text-gray-300">Symbol (1 char):</label>
-                        <input type="text" id="add-brush-symbol-input" maxlength="1" class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-gray-100 text-center font-mono" placeholder="e.g., Y">
-                        <label for="add-brush-definition-input" class="block text-sm font-medium text-gray-300">Definition (t_ or f_):</label>
-                        <input type="text" id="add-brush-definition-input" class="w-full p-2 rounded bg-gray-700 border border-gray-600 text-gray-100 font-mono" placeholder="e.g., t_dirt or f_table">
-                        <button id="add-brush-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">Add / Update Brush</button>
-                    </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-600">
+                <h3 class="text-sm font-semibold mb-2 text-gray-300">Symmetry Mode</h3>
+                <div class="flex flex-col items-start space-y-2">
+                    <label class="flex items-center text-gray-300">
+                        <input type="checkbox" id="v-symmetry-checkbox" class="h-4 w-4 text-yellow-500 rounded border-gray-500 focus:ring-yellow-500">
+                        <span class="ml-2 text-sm">Vertical (Mirror Y)</span>
+                    </label>
+                    <label class="flex items-center text-gray-300">
+                        <input type="checkbox" id="h-symmetry-checkbox" class="h-4 w-4 text-yellow-500 rounded border-gray-500 focus:ring-yellow-500">
+                        <span class="ml-2 text-sm">Horizontal (Mirror X)</span>
+                    </label>
                 </div>
             </div>
         </div>
+
+        <div class="mb-4 p-3 bg-gray-700 rounded-lg shadow-inner">
+            <h3 class="text-lg font-semibold mb-3 text-gray-200 border-b border-gray-700 pb-1">Add Custom Brush</h3>
+            <div class="flex flex-col gap-2">
+                <label for="add-brush-symbol-input" class="block text-sm font-medium text-gray-300">Symbol (1 char):</label>
+                <input type="text" id="add-brush-symbol-input" maxlength="1" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-gray-100 text-center font-mono" placeholder="e.g., Y">
+                <label for="add-brush-definition-input" class="block text-sm font-medium text-gray-300">Definition (t_ or f_):</label>
+                <input type="text" id="add-brush-definition-input" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-gray-100 font-mono" placeholder="e.g., t_dirt or f_table">
+                <button id="add-brush-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">Add / Update</button>
+            </div>
+        </div>
+
+        <h3 class="text-lg font-semibold mb-2 text-gray-200 border-b border-gray-700 pb-1">Brushes</h3>
+        <div class="mb-2">
+            <input type="text" id="palette-search" placeholder="Search brushes..." class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500">
+        </div>
+        <div id="palette" class="grid flex-grow pb-4"></div>
+        <input type="color" id="brush-color-picker" style="visibility:hidden; position:absolute; top:0; left:0;">
     </div>
+</div>
 
     <div id="dpad-container" class="fixed bottom-6 right-6 flex flex-col items-center gap-2 z-[3000] transition-all duration-300">
     <button id="dpad-expand-btn" class="hidden bg-gray-800 border-2 border-blue-500 text-white w-10 h-10 rounded-full shadow-lg hover:bg-blue-600">
@@ -738,6 +757,7 @@
     </div>
 </div>
 
+
     <script>
         // --- GLOBAL VARIABLES & CONFIGURATION ---
         let GRID_ROWS = 24; 
@@ -760,8 +780,8 @@ let baseMapName = "hospital"; // Default base name
         const inspectorModeBtn = document.getElementById('inspector-mode-btn'); // NEW Button
         const inspectorDisplay = document.getElementById('inspector-display');  // NEW Display
 
-        let selectionStartCoords = null; 
-        let clipboardGrid = null;        
+        
+        
         
         let pasteTimer = null;         
         const PASTE_DELAY = 1000;      
@@ -845,6 +865,7 @@ function flushPaint() {
         applyBrush(r, c);
     }
     pendingPaint.clear();
+    drawChunkBorders();
     rafScheduled = false;
 }
 
@@ -863,7 +884,10 @@ grid: Array(24).fill(null).map(() => Array(24).fill('.')),
         items: [],
         placedItems: [],
         fillTer: "t_floor",
-        omTerrain: "hospital"
+        omTerrain: "hospital", 
+        paletteId: null, 
+        paletteDefs: {}, 
+        customDefs: {}
     }
 };
 
@@ -884,6 +908,10 @@ function getLayerID(baseName, z) {
         let selectedTile = DEFAULT_TILE;
         let isPainting = false;
         let mapGrid = [];
+       
+        let selectionStartCoords = null; 
+let selectionCurrentCoords = null; 
+let clipboardGrid = null;
        
        
         let tileDefinitions = {};
@@ -941,6 +969,10 @@ const DISPLAY_NAME_OVERRIDES = {
 "t_window_bars": "Window with Bars",
 "t_column": "Column",
 "t_rock": "Solid Rock",
+"t_ramp_down_high": "Ramp down (high end)", 
+      "t_ramp_down_low": "Ramp down (low end)", 
+     "t_ramp_up_high": "Ramp up (high end)", 
+     "t_ramp_up_low": "Ramp up (low end)", 
 "t_metal_floor": "Metal Floor",
 "t_thconc_floor_olight": "Concrete Floor with Light",
 "t_thconc_floor": "Concrete Floor",
@@ -1157,11 +1189,62 @@ function renderPresetDropdown() {
             updateStatus(`Loaded preset: ${data.name}. You can still edit values.`, 'text-blue-300');
         });
 
-        itemPresetSelect.addEventListener('change', (e) => {
-    const contentsDiv = document.getElementById('item-group-contents');
+        // --- NEW HELPERS FOR NESTED ITEM GROUPS (Moved to Global Scope) ---
+function getEntryDisplayName(entry) {
+    if (!entry) return "Unknown";
+    if (typeof entry === 'string') return entry;
+    if (Array.isArray(entry)) {
+        return entry.map(e => {
+            let name = getEntryDisplayName(e);
+            return e.prob ? `${name} (${e.prob}%)` : name;
+        }).join(', ');
+    }
+    if (entry.item) return entry.item;
+    if (entry.group) return `[Group] ${entry.group}`;
     
+    let parts = [];
+    if (entry.collection) parts.push(`Collection: [${getEntryDisplayName(entry.collection)}]`);
+    if (entry.distribution) parts.push(`Dist: [${getEntryDisplayName(entry.distribution)}]`);
+    
+    return parts.length > 0 ? parts.join(' | ') : "Unknown";
+}
+
+function entryContainsTerm(entry, term) {
+    if (!entry) return false;
+    if (typeof entry === 'string') return entry.toLowerCase().includes(term);
+    if (Array.isArray(entry)) return entry.some(e => entryContainsTerm(e, term));
+    
+    if (entry.item && entry.item.toLowerCase().includes(term)) return true;
+    if (entry.group && entry.group.toLowerCase().includes(term)) return true;
+    if (entry.collection && entryContainsTerm(entry.collection, term)) return true;
+    if (entry.distribution && entryContainsTerm(entry.distribution, term)) return true;
+    return false;
+}
+
+function findMatchingItemName(entry, term) {
+    if (!entry) return null;
+    if (typeof entry === 'string') return entry.toLowerCase().includes(term) ? entry : null;
+    if (Array.isArray(entry)) {
+        for (let e of entry) {
+            let match = findMatchingItemName(e, term);
+            if (match) return match;
+        }
+        return null;
+    }
+    if (entry.item && entry.item.toLowerCase().includes(term)) return entry.item;
+    if (entry.group && entry.group.toLowerCase().includes(term)) return entry.group;
+    if (entry.collection) return findMatchingItemName(entry.collection, term);
+    if (entry.distribution) return findMatchingItemName(entry.distribution, term);
+    return null;
+}
+
+// --- ITEM PRESET LISTENER ---
+itemPresetSelect.addEventListener('change', (e) => {
+    const floatingWindow = document.getElementById('floating-item-window');
+    const contentsDiv = document.getElementById('floating-item-content-area');
+   
     if (!e.target.value) {
-        contentsDiv.classList.add('hidden');
+        if (floatingWindow) floatingWindow.classList.add('hidden'); 
         return;
     }
     
@@ -1171,33 +1254,34 @@ function renderPresetDropdown() {
     itemRepeatInput.value = data.repeat;
     if(itemSymbolInput.value === '') itemSymbolInput.value = 'i';
     
-    // --- NEW: Display the contents of the item group ---
     const fullGroupData = fetchedItemGroups[data.group];
     
-    if (fullGroupData) {
-        let html = `<div class="font-bold text-white mb-1 border-b border-blue-700 pb-1">Contents:</div>`;
+    if (fullGroupData && contentsDiv) {
+        let html = `<div class="font-bold text-white mb-2 border-b border-blue-700 pb-1">Preset: ${data.group}</div>`;
         html += `<ul class="list-disc pl-4 space-y-1">`;
         
-        // Handle 'entries' or 'items' arrays
         const entries = fullGroupData.entries || fullGroupData.items || [];
-        
         entries.forEach(entry => {
-            // CDDA items can be defined by "item" or "group" (nested groups)
-            const itemName = entry.item || entry.group || "Unknown";
-            const prob = entry.prob ? `<span class="text-blue-400">(${entry.prob}%)</span>` : '';
+            const itemName = getEntryDisplayName(entry);
+            const prob = entry.prob ? `<span class="text-blue-400 font-semibold">(${entry.prob}%)</span>` : '';
             html += `<li>${itemName} ${prob}</li>`;
         });
         
         html += `</ul>`;
         contentsDiv.innerHTML = html;
-        contentsDiv.classList.remove('hidden');
+        
+        if (floatingWindow) {
+            floatingWindow.classList.remove('hidden');
+            contentsDiv.style.display = 'block';
+            const toggleBtn = document.getElementById('toggle-item-window-btn');
+            if (toggleBtn) toggleBtn.textContent = '−';
+        }
     } else {
-        contentsDiv.classList.add('hidden');
+        if (floatingWindow) floatingWindow.classList.add('hidden');
     }
 
     updateStatus(`Loaded preset: ${data.name}.`, 'text-blue-300');
 });
-       
        
       
      
@@ -1215,6 +1299,23 @@ function renderPresetDropdown() {
             specialContainer.style.opacity = isMultiTile ? '1' : '0.5';
             specialContainer.style.pointerEvents = isMultiTile ? 'auto' : 'none';
         }
+       
+        function getStringColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    // Mix the hash with a base value to generate distinct, readable colors consistently
+    const r = (hash & 0xFF0000) >> 16;
+    const g = (hash & 0x00FF00) >> 8;
+    const b = hash & 0x0000FF;
+    
+    const mixedR = Math.floor((r + 128) / 2);
+    const mixedG = Math.floor((g + 128) / 2);
+    const mixedB = Math.floor((b + 128) / 2);
+    
+    return '#' + ((1 << 24) + (mixedR << 16) + (mixedG << 8) + mixedB).toString(16).slice(1);
+}
         
         
 
@@ -1432,13 +1533,17 @@ function clearRoomVisuals() { clearOverlay(); }
                 return;
             }
 
-            tileDefinitions[symbol] = {
-                color: '#8b5cf6', 
-                name: definition.replace(/t_|f_/, '').replace(/_/g, ' '),
-                symbol: symbol,
-                text: '#fff',
-                definition: definition
-            };
+            const newDef = {
+        color: '#8b5cf6', 
+        name: definition.replace(/t_|f_/, '').replace(/_/g, ' '),
+        symbol: symbol,
+        text: '#fff',
+        definition: definition
+    };
+    addCustomBrush(symbol, definition, false);
+   
+   layers[currentZ].customDefs[symbol] = newDef;
+   tileDefinitions = { ...layers[currentZ].paletteDefs, ...layers[currentZ].customDefs };
 
             renderPalette();
             const safeId = symbol.replace(/[^a-zA-Z0-9]/g, '_');
@@ -2088,16 +2193,27 @@ btnSetFloor.addEventListener('click', () => {
         }
 
         function addCustomBrush(symbol, definition, skipRender = false) {
-             const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-             tileDefinitions[symbol] = {
-                color: randomColor, 
-                name: getFriendlyName(definition),
-                symbol: symbol,
-                text: '#fff',
-                definition: definition
-            };
-            if(!skipRender) renderPalette();
-        }
+    const consistentColor = getStringColor(definition);
+    const newDef = {
+        color: consistentColor, 
+        name: getFriendlyName(definition),
+        symbol: symbol,
+        text: '#fff',
+        definition: definition
+    };
+    
+    // 1. Save directly into the CURRENT layer's memory
+    layers[currentZ].customDefs[symbol] = newDef;
+    
+    // 2. Safely rebuild the global definitions
+    tileDefinitions = { 
+        ...MASTER_TILE_DEFINITIONS, 
+        ...layers[currentZ].paletteDefs, 
+        ...layers[currentZ].customDefs 
+    };
+
+    if(!skipRender) renderPalette();
+}
         
         function handlePaletteImport() {
              paletteFileInput.click();
@@ -2130,31 +2246,36 @@ btnSetFloor.addEventListener('click', () => {
                     
                     let brushesAdded = 0;
                     let definitionsToImport = {};
-                    let paletteObject = Array.isArray(data) ? data.find(item => item.terrain || item.furniture) : data;
-
+                    let paletteObject = Array.isArray(data) ? data.find(item => item.type === "palette" || item.terrain || item.furniture) : data;
+                    
                     if (!paletteObject || (!paletteObject.terrain && !paletteObject.furniture)) {
                         throw new Error("Invalid palette JSON structure.");
                     }
+                    let pid = paletteObject.id || prompt("Enter a Palette ID for this import (e.g. 'hospital_palette'):", "my_palette");
+                    layers[currentZ].paletteId = pid;
+layers[currentZ].paletteDefs = {};
+                    
                     
                     const processPair = (symbol, definition) => {
                         let finalDef = definition;
                         if (Array.isArray(definition)) finalDef = definition[0];
                         if (typeof finalDef !== 'string' || (!finalDef.startsWith('t_') && !finalDef.startsWith('f_') && finalDef !== 'open')) return;
-                        const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-                        definitionsToImport[symbol] = {
-                            color: randomColor, 
-                            name: finalDef.replace(/t_|f_/, '').replace(/_/g, ' '),
-                            symbol: symbol,
-                            text: '#fff',
-                            definition: finalDef
-                        };
-                        brushesAdded++;
-                    };
+                        const consistentColor = getStringColor(finalDef);
+                        layers[currentZ].paletteDefs[symbol] = {
+        color: consistentColor, 
+        name: finalDef.replace(/t_|f_/, '').replace(/_/g, ' '),
+        symbol: symbol,
+        text: '#fff',
+        definition: finalDef
+    };
+    brushesAdded++;
+};
 
                     if (paletteObject.terrain) Object.entries(paletteObject.terrain).forEach(([symbol, definition]) => processPair(symbol, definition));
-                    if (paletteObject.furniture) Object.entries(paletteObject.furniture).forEach(([symbol, definition]) => processPair(symbol, definition));
+if (paletteObject.furniture) Object.entries(paletteObject.furniture).forEach(([symbol, definition]) => processPair(symbol, definition));
 
                     tileDefinitions = { ...tileDefinitions, ...definitionsToImport };
+                    tileDefinitions = { ...layers[currentZ].paletteDefs, ...layers[currentZ].customDefs };
                     delete tileDefinitions[DEFAULT_TILE]; 
                     tileDefinitions = { ...MASTER_TILE_DEFINITIONS, ...tileDefinitions };
                     
@@ -2187,28 +2308,16 @@ btnSetFloor.addEventListener('click', () => {
     }
 
     const { minX, maxX, minY, maxY } = lastSelectionBounds;
-
-    // Check if it's a single tile or a range
     const xVal = (minX === maxX) ? minX : [minX, maxX];
     const yVal = (minY === maxY) ? minY : [minY, maxY];
 
-    // Set pending data so the panel knows what to do
-    pendingQuickAdd = {
-        type: type,
-        x: xVal,
-        y: yVal
-    };
-
-    // Open the panel
+    pendingQuickAdd = { type: type, x: xVal, y: yVal };
+    
+    // openQuickAdd now handles array stringification safely
     openQuickAdd(type);
-
-    // MANUALLY OVERRIDE the input fields with the JSON string of the arrays
-    // (openQuickAdd might try to set them to simple values, we force the range)
-    document.getElementById('quick-add-x').value = JSON.stringify(xVal);
-    document.getElementById('quick-add-y').value = JSON.stringify(yVal);
     
     updateStatus(`Configuring ${type} spawn for area ${JSON.stringify(xVal)} / ${JSON.stringify(yVal)}`, "text-yellow-300");
-}
+} 
 
 function openBrushEditor(symbol) {
     const def = tileDefinitions[symbol] || MASTER_TILE_DEFINITIONS[symbol];
@@ -2253,6 +2362,7 @@ document.getElementById('modal-save-btn').addEventListener('click', () => {
         delete tileDefinitions[currentEditingSymbol].linkedTerrain;
         updateStatus(`Updated '${currentEditingSymbol}': Terrain link removed`, "text-gray-400");
     }
+    layers[currentZ].customDefs[currentEditingSymbol] = tileDefinitions[currentEditingSymbol];
 
     // Update Visuals
     renderPalette();
@@ -2296,23 +2406,31 @@ function openQuickAdd(type) {
     quickAddMode = type;
     const select = document.getElementById('quick-add-select');
     const panel = document.getElementById('quick-add-panel');
+    const searchInput = document.getElementById('quick-add-search');
     
+    // Uncollapse the sidebar so the user can actually see the panel! (Fixes Inspector issue)
+    const sidebar = document.getElementById('left-sidebar');
+    if (sidebar && sidebar.classList.contains('collapsed')) {
+        toggleSidebar();
+    }
+
+    if (searchInput) searchInput.value = ''; // Reset search
+
     // 1. Populate Dropdown
-    select.innerHTML = '<option value="">-- Custom --</option>';
+    select.innerHTML = '<option value="">-- Custom (Type in search box) --</option>';
     const presets = type === "monster" ? monsterPresets : itemPresets;
     
     presets.forEach((p, index) => {
         const opt = document.createElement('option');
-        // Store index to look up full data later
         opt.value = index; 
         opt.textContent = p.name || (p.id || p.group);
         select.appendChild(opt);
     });
 
-    // 2. Pre-fill Inputs with clicked coordinates
+    // 2. Safely Pre-fill Inputs (Checks if object to maintain [brackets] for arrays)
     if (pendingQuickAdd) {
-        document.getElementById('quick-add-x').value = pendingQuickAdd.x;
-        document.getElementById('quick-add-y').value = pendingQuickAdd.y;
+        document.getElementById('quick-add-x').value = typeof pendingQuickAdd.x === 'object' ? JSON.stringify(pendingQuickAdd.x) : pendingQuickAdd.x;
+        document.getElementById('quick-add-y').value = typeof pendingQuickAdd.y === 'object' ? JSON.stringify(pendingQuickAdd.y) : pendingQuickAdd.y;
     }
     
     // 3. Reset stats
@@ -2325,14 +2443,45 @@ function openQuickAdd(type) {
 // listener to auto-fill stats when preset changes
 document.getElementById('quick-add-select').addEventListener('change', (e) => {
     const idx = e.target.value;
-    if (idx === "") return;
+    const contentsDiv = document.getElementById('purple-item-contents');
+    
+    // Hide display if nothing is selected
+    if (idx === "") {
+        if (contentsDiv) contentsDiv.classList.add('hidden');
+        return;
+    }
     
     const presets = quickAddMode === "monster" ? monsterPresets : itemPresets;
     const data = presets[idx];
     
     if (data) {
+        // Auto-fill inputs
         if(data.chance) document.getElementById('quick-add-chance').value = data.chance;
         if(data.repeat) document.getElementById('quick-add-repeat').value = data.repeat;
+
+        // Display contents logic: Only trigger if it's an item group
+        if (quickAddMode === "item" && data.group && fetchedItemGroups[data.group]) {
+            const fullGroupData = fetchedItemGroups[data.group];
+            let html = `<div class="font-bold text-white mb-1 border-b border-purple-500 pb-1">Contents: ${data.group}</div>`;
+            html += `<ul class="list-disc pl-4 space-y-1">`;
+            
+            const entries = fullGroupData.entries || fullGroupData.items || [];
+            entries.forEach(entry => {
+                const itemName = getEntryDisplayName(entry);
+                const prob = entry.prob ? `<span class="text-purple-300 font-semibold">(${entry.prob}%)</span>` : '';
+                html += `<li>${itemName} ${prob}</li>`;
+            });
+            
+            html += `</ul>`;
+            
+            if (contentsDiv) {
+                contentsDiv.innerHTML = html;
+                contentsDiv.classList.remove('hidden');
+            }
+        } else {
+            // Hide if it's a monster preset
+            if (contentsDiv) contentsDiv.classList.add('hidden');
+        }
     }
 });
 
@@ -2612,6 +2761,21 @@ function updateRoomPreview(endR, endC) {
         minY: startR, 
         maxY: maxR 
     };
+            const quickAddPanel = document.getElementById('quick-add-panel');
+    if (quickAddPanel && !quickAddPanel.classList.contains('hidden')) {
+        const xVal = (startC === maxC) ? startC : [startC, maxC];
+        const yVal = (startR === maxR) ? startR : [startR, maxR];
+
+        if (pendingQuickAdd) {
+            pendingQuickAdd.x = xVal;
+            pendingQuickAdd.y = yVal;
+        } else {
+            pendingQuickAdd = { type: quickAddMode || 'monster', x: xVal, y: yVal };
+        }
+
+        document.getElementById('quick-add-x').value = typeof xVal === 'object' ? JSON.stringify(xVal) : xVal;
+        document.getElementById('quick-add-y').value = typeof yVal === 'object' ? JSON.stringify(yVal) : yVal;
+    }
             const newClipboard = [];
             for (let r = startR; r <= maxR; r++) {
                 const rowData = [];
@@ -2638,6 +2802,7 @@ function updateRoomPreview(endR, endC) {
                     }
                 }
             }
+            drawChunkBorders();
             renderPalette(); 
             updateStatus('Selection pasted.', 'text-green-400');
         }
@@ -2667,10 +2832,11 @@ function updateRoomPreview(endR, endC) {
 
         function handleSelectorStart(e) {
             const coords = getTileCoordinates(e);
-            if (!coords) return;
-            e.preventDefault(); 
-            selectionStartCoords = { r: coords.row, c: coords.col };
-            isDragMode = false; 
+    if (!coords) return;
+    e.preventDefault(); 
+    selectionStartCoords = { r: coords.row, c: coords.col };
+    selectionCurrentCoords = { r: coords.row, c: coords.col }; // <-- ADD THIS
+    isDragMode = false
             if (clipboardGrid) {
                 updatePastePreview(coords.row, coords.col);
                 updateStatus("Hold for 2 seconds to paste...", "text-yellow-300");
@@ -2700,6 +2866,7 @@ function updateRoomPreview(endR, endC) {
         function handleSelectorMove(e) {
             const coords = getTileCoordinates(e);
             if (!coords || !selectionStartCoords) return;
+            selectionCurrentCoords = { r: coords.row, c: coords.col }; 
             const distR = Math.abs(coords.row - selectionStartCoords.r);
             const distC = Math.abs(coords.col - selectionStartCoords.c);
             if (distR > 0 || distC > 0) {
@@ -2721,15 +2888,17 @@ function updateRoomPreview(endR, endC) {
                 clearSelectorVisuals();
                 updateStatus("Released too early. Hold 2s to paste.", "text-gray-400");
                 selectionStartCoords = null;
+                selectionCurrentCoords = null;
                 return;
             }
             if (selectionStartCoords) {
                 const coords = getTileCoordinates(e);
-                const endR = coords ? coords.row : selectionStartCoords.r;
-                const endC = coords ? coords.col : selectionStartCoords.c;
-                if (!clipboardGrid || isDragMode) copySelection(endR, endC);
+                const endR = selectionCurrentCoords ? selectionCurrentCoords.r : selectionStartCoords.r;
+        const endC = selectionCurrentCoords ? selectionCurrentCoords.c : selectionStartCoords.c;
+if (!clipboardGrid || isDragMode) copySelection(endR, endC);
             }
             selectionStartCoords = null;
+            selectionCurrentCoords = null;
             isDragMode = false;
             clearSelectorVisuals();
         }
@@ -3311,8 +3480,6 @@ window.quickAddMonster = function(x, y) {
 
    
    
-document.getElementById('selector-controls').classList.remove('hidden');
-document.getElementById('selector-controls').classList.add('hidden');
 
 function rotateGridRight(grid) {
     const rows = grid.length;
@@ -3404,6 +3571,7 @@ function finalizeRoom(endR, endC) {
             }
         }
     }
+    drawChunkBorders();
     updateStatus("Room Created.", "text-indigo-300");
 }
 
@@ -3413,27 +3581,33 @@ document.getElementById('quick-add-confirm').addEventListener('click', () => {
 
     // 1. Get Inputs
     const select = document.getElementById('quick-add-select');
+    const searchInput = document.getElementById('quick-add-search').value.trim();
     const xInput = document.getElementById('quick-add-x').value;
     const yInput = document.getElementById('quick-add-y').value;
     const chance = parseInt(document.getElementById('quick-add-chance').value, 10);
     const repeat = parseCoordInput(document.getElementById('quick-add-repeat').value);
     
-    // 2. Resolve ID/Group from Preset
-    let idValue = "mon_zombie"; // default
+    // 2. Resolve ID/Group: Prefer Dropdown -> Then Search Input -> Then Default
+    let idValue = ""; 
     if (select.value !== "") {
         const presets = quickAddMode === "monster" ? monsterPresets : itemPresets;
         const p = presets[select.value];
         idValue = quickAddMode === "monster" ? p.id : p.group;
+    } else if (searchInput !== "") {
+        idValue = searchInput; // Use what they typed if no preset is chosen
     } else {
-        // If you typed a manual ID logic, it would go here. 
-        // For now we assume preset or fallback.
+        idValue = quickAddMode === "monster" ? "mon_zombie" : "custom_item_group";
     }
 
     // 3. Parse Coords
     const x = parseCoordInput(xInput);
     const y = parseCoordInput(yInput);
 
-    if (x === null || y === null) return;
+    if (x === null || y === null) {
+        updateStatus("Invalid coordinates! Array format is [min,max]", "text-red-400");
+        return;
+    }
+
 
     // 4. Construct Object & Save
     if (quickAddMode === "monster") {
@@ -3475,6 +3649,98 @@ document.getElementById('quick-add-confirm').addEventListener('click', () => {
 });
 
 
+// We don't need to re-declare itemPresetSelect, you already did it at the top!
+const itemSearchInput = document.getElementById('item-group-search');
+
+itemSearchInput.addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase();
+    
+    // Clear current options (keep the default one)
+    itemPresetSelect.innerHTML = '<option value="">-- Load Preset (Optional) --</option>';
+
+    // Filter against the itemPresets array you built during your fetch
+    const filtered = itemPresets.filter(preset => {
+        const nameMatch = preset.name.toLowerCase().includes(term);
+        
+        // Search "Inside": Check if any item in the fetched group matches
+        // Search "Inside": Check if any item in the fetched group matches
+        let itemMatch = false;
+        const fullGroupData = fetchedItemGroups[preset.group];
+        
+        if (fullGroupData) {
+            const entries = fullGroupData.entries || fullGroupData.items || [];
+            itemMatch = entries.some(entry => entryContainsTerm(entry, term)); // <-- UPDATED
+        }
+
+        return nameMatch || itemMatch;
+    });
+
+    // Re-populate the dropdown with results
+    filtered.forEach(preset => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify(preset);
+        
+        const fullGroupData = fetchedItemGroups[preset.group];
+        let matchingItem = null;
+        
+        if (!preset.name.toLowerCase().includes(term) && fullGroupData) {
+            const entries = fullGroupData.entries || fullGroupData.items || [];
+            const found = entries.find(entry => entryContainsTerm(entry, term)); // <-- UPDATED
+            if (found) matchingItem = findMatchingItemName(found, term); // <-- UPDATED
+        }
+
+        if (matchingItem) {
+            opt.textContent = `${preset.name} (contains: ${matchingItem})`;
+        } else {
+            opt.textContent = preset.name;
+        }
+        
+        itemPresetSelect.appendChild(opt);
+    });
+});
+
+document.getElementById('quick-add-search').addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase();
+    const select = document.getElementById('quick-add-select');
+    
+    select.innerHTML = '<option value="">-- Custom (Use this text) --</option>';
+
+    const presets = quickAddMode === "monster" ? monsterPresets : itemPresets;
+
+    const filtered = presets.filter((preset) => {
+        const nameMatch = (preset.name || preset.id || preset.group || "").toLowerCase().includes(term);
+        
+        let itemMatch = false;
+        if (quickAddMode === "item" && preset.group && fetchedItemGroups[preset.group]) {
+            const fullGroupData = fetchedItemGroups[preset.group];
+            const entries = fullGroupData.entries || fullGroupData.items || [];
+            itemMatch = entries.some(entry => entryContainsTerm(entry, term)); // <-- UPDATED
+        }
+        return nameMatch || itemMatch;
+    });
+
+    filtered.forEach(preset => {
+        const opt = document.createElement('option');
+        opt.value = presets.indexOf(preset); 
+        
+        let matchingItem = null;
+        if (quickAddMode === "item" && !preset.name.toLowerCase().includes(term) && fetchedItemGroups[preset.group]) {
+            const fullGroupData = fetchedItemGroups[preset.group];
+            const entries = fullGroupData.entries || fullGroupData.items || [];
+            const found = entries.find(entry => entryContainsTerm(entry, term)); // <-- UPDATED
+            if (found) matchingItem = findMatchingItemName(found, term); // <-- UPDATED
+        }
+
+        if (matchingItem) {
+            opt.textContent = `${preset.name} (contains: ${matchingItem})`;
+        } else {
+            opt.textContent = preset.name || preset.id || preset.group;
+        }
+
+        select.appendChild(opt);
+    });
+});
+
 function rotateClipboardLeft() {
     if (!clipboardGrid) return;
     clipboardGrid = rotateGridLeft(clipboardGrid);
@@ -3508,9 +3774,12 @@ function changeLayer(delta) {
             items: [],
             placedItems: [],
             fillTer: defaultFill,
-            omTerrain: getLayerID(baseMapName, newZ)
+            omTerrain: getLayerID(baseMapName, newZ),
+            paletteId: layers[currentZ].paletteId, 
+            paletteDefs: JSON.parse(JSON.stringify(layers[currentZ].paletteDefs)), // Deep copy inheritance
+            customDefs: JSON.parse(JSON.stringify(layers[currentZ].customDefs))    // Deep copy inheritance
         };
-    } 
+    }
     
     // 2. SYNC DIMENSIONS (The "Hot Pink" Fix Enhanced)
     // If we switch to a layer that is smaller than current global settings, resize it up.
@@ -3541,6 +3810,9 @@ function changeLayer(delta) {
     monsterSpawns = layers[currentZ].monsters;
     itemSpawns = layers[currentZ].items;             // Maps generic items
     placeItemsSpawns = layers[currentZ].placedItems; // Maps placed items
+    tileDefinitions = { ...layers[currentZ].paletteDefs, ...layers[currentZ].customDefs };
+    delete tileDefinitions[DEFAULT_TILE]; // CRUCIAL: Prevents '.' from overriding the background grass color
+    tileDefinitions = { ...MASTER_TILE_DEFINITIONS, ...tileDefinitions };
     
     // 4. Update UI
     const display = document.getElementById('z-level-display');
@@ -3551,7 +3823,8 @@ function changeLayer(delta) {
     GRID_COLS = mapGrid[0].length;
     if (gridRowsInput) gridRowsInput.value = GRID_ROWS;
     if (gridColsInput) gridColsInput.value = GRID_COLS;
-    
+   
+    renderPalette();
     renderGrid();
     refreshSpawnLists();
     
@@ -3645,8 +3918,8 @@ function downloadExport() {
 
         // --- C. PREPARE DEFINITIONS ---
         // Reuse your existing helper to extract palette data
-        const defs = getLayerDefinitions(grid); 
-
+        const defs = getLayerDefinitions(grid, l); // Pass the layer object 'l'
+        
         // --- D. CREATE MAPGEN OBJECT ---
         // Note: CDDA mapgen handles the slicing automatically if we provide
         // the 2D om_terrain array and the full rows.
@@ -3658,10 +3931,14 @@ function downloadExport() {
             "fill_ter": l.fillTer,
             "rows": generateRows(grid)
         };
+       
+       if (l.paletteId) {
+    mapgenPayload.palettes = [ l.paletteId ];
+}
         
         // Only attach these fields if they actually contain data
         if (Object.keys(defs.terrain).length > 0) mapgenPayload.terrain = defs.terrain;
-        if (Object.keys(defs.furniture).length > 0) mapgenPayload.furniture = defs.furniture;
+if (Object.keys(defs.furniture).length > 0) mapgenPayload.furniture = defs.furniture;
         if (l.monsters && l.monsters.length > 0) mapgenPayload.place_monsters = l.monsters;
         if (l.items && l.items.length > 0) mapgenPayload.items = l.items;
         if (l.placedItems && l.placedItems.length > 0) mapgenPayload.place_items = l.placedItems;
@@ -3739,26 +4016,34 @@ function extrudeStructure(direction) {
     updateStatus(`Extruded layout to Z=${currentZ}`, "text-blue-400");
 }
 
-function getLayerDefinitions(gridData) {
+// We now pass the specific layer object into this function
+function getLayerDefinitions(gridData, layer) {
     const usedSymbols = new Set(gridData.flat());
     const terrain = {};
     const furniture = {};
-    const allBrushes = { ...MASTER_TILE_DEFINITIONS, ...tileDefinitions };
+    
+    // Master pool of all available brushes for this floor
+    const allBrushes = { ...MASTER_TILE_DEFINITIONS, ...layer.paletteDefs, ...layer.customDefs };
 
     usedSymbols.forEach(symbol => {
-        // --- FIX: EXPLICITLY HANDLE DOT (.) ---
         if (symbol === '.') {
             terrain['.'] = 't_grass';
             return;
+        }
+
+        // --- NEW OPTIMIZATION LOGIC ---
+        // If this symbol is provided by the imported palette AND the user hasn't 
+        // manually overridden it with a custom brush, SKIP IT.
+        if (layer.paletteId && layer.paletteDefs[symbol] && !layer.customDefs[symbol]) {
+            return; 
         }
 
         const def = allBrushes[symbol];
         if (def && def.definition && def.definition !== 'unknown') {
             if (def.definition.startsWith('f_')) {
                 furniture[symbol] = def.definition;
-                // Handle linked terrain if necessary
                 if (def.linkedTerrain) {
-                   // logic for linked terrain if you have it
+                   terrain[symbol] = def.linkedTerrain;
                 }
             } else {
                 terrain[symbol] = def.definition;
@@ -3807,6 +4092,8 @@ newExportBtn.addEventListener('click', downloadExport);
 
 updateStatus("System Updated: Multi-Level Export & Extrusion Fixed.", "text-purple-400");
 
+
+
 // --- INITIALIZATION FIX ---
 function initApp() {
     // Let changeLayer handle the assignment to your existing 'let mapGrid'
@@ -3819,7 +4106,7 @@ function initApp() {
     const defaultEl = document.getElementById('palette-.');
     if(defaultEl) selectTile('.', defaultEl);
    
-   fetchExternalItemGroups();
+   fetchAllItemGroups();
 }
 
 // Ensure initApp runs when the window is ready
