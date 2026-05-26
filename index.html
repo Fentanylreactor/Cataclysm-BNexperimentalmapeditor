@@ -547,9 +547,9 @@
         
 
             <div class="flex flex-col xl:flex-row gap-6 w-full">
-                <div class="flex-grow flex flex-col items-center p-4 bg-gray-800 rounded-xl shadow-2xl overflow-x-auto mx-auto">
-                    <h2 id="grid-title" class="text-xl font-semibold mb-4 text-gray-200">The Canvas (24x24)</h2>
-                    <div id="canvas-wrapper" style="position: relative; overflow: hidden; touch-action: none; border: 1px solid #4b5563;">
+                <div class="flex-grow flex flex-col items-start p-4 bg-gray-800 rounded-xl shadow-2xl overflow-x-auto mx-auto w-full">
+    <h2 id="grid-title" class="text-xl font-semibold mb-4 text-gray-200 self-center">The Canvas (24x24)</h2>
+    <div id="canvas-wrapper" class="mx-auto" style="position: relative; overflow: hidden; touch-action: none; border: 1px solid #4b5563; min-width: max-content;">
     <canvas id="map-canvas" style="position: absolute; top: 0; left: 0;"></canvas>
     <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
 </div>
@@ -574,7 +574,19 @@
         Export Selection (Nested)
     </button>
 </div>
-                    <div class="grid grid-cols-2 gap-2 mb-2">
+
+<div class="flex items-center space-x-1 ml-2 border-l border-gray-600 pl-2">
+    <button id="toggle-items-flag" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition font-medium" title="Toggle Item Indicators">
+        Items: ON
+    </button>
+    <button id="btn-reset-hidden" class="hidden px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium transition shadow-md" title="Show all hidden spawns">
+    Show Hidden
+    </button>
+    <button id="toggle-monsters-flag" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition font-medium" title="Toggle Monster Indicators">
+        Monsters: ON
+    </button>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-2">
     <button id="selector-mode-btn" class="w-full py-2 bg-yellow-600 hover:bg-yellow-500 rounded text-xs font-bold text-white shadow">
         Selector Tool (Off)
     </button>
@@ -915,6 +927,7 @@ let clipboardGrid = null;
        
        
         let tileDefinitions = {};
+        let hiddenSpawnIds = new Set();
         // --- NEW: Track history of selected brushes ---
 let brushHistory = [];
         
@@ -933,6 +946,16 @@ let placeItemsSpawns = [];
        
        let isRoomMode = false;
 let roomStartCoords = null;
+
+// State variables to track if flags should be displayed
+let showItemFlags = true;
+let showMonsterFlags = true;
+
+// Get references to the new buttons
+const itemFlagBtn = document.getElementById('toggle-items-flag');
+const monsterFlagBtn = document.getElementById('toggle-monsters-flag');
+
+
 
 const tileSize = 20; // Or dynamically set based on mobile/desktop
 const mapCanvas = document.getElementById('map-canvas');
@@ -1335,38 +1358,65 @@ itemPresetSelect.addEventListener('change', (e) => {
             return isNaN(num) ? null : num;
         }
 
-        function renderGrid(forceRebuild = false) {
+// Helper to check if a tile overlaps with a spawn (supports single coords and [min, max] zones)
+// Helper to check if a tile overlaps with a spawn
+function hasSpawnAt(spawnsArray, row, col) {
+    if (!spawnsArray || spawnsArray.length === 0) return false;
+    
+    return spawnsArray.some(spawn => {
+        // --- NEW: Skip this spawn if it is toggled off ---
+        if (spawn.hidden) return false; 
+        
+        if (spawn.x === undefined || spawn.y === undefined) return false;
+
+        // Check Column (X axis)
+        let inX = false;
+        if (Array.isArray(spawn.x)) {
+            inX = (col >= spawn.x[0] && col <= spawn.x[1]);
+        } else {
+            inX = (col === spawn.x);
+        }
+
+        // Check Row (Y axis)
+        let inY = false;
+        if (Array.isArray(spawn.y)) {
+            inY = (row >= spawn.y[0] && row <= spawn.y[1]);
+        } else {
+            inY = (row === spawn.y);
+        }
+
+        return inX && inY;
+    });
+}
+        
+function renderGrid(forceRebuild = false) {
     const width = GRID_COLS * tileSize;
     const height = GRID_ROWS * tileSize;
    
-   canvasWrapper.style.width = width + 'px';
+    canvasWrapper.style.width = width + 'px';
     canvasWrapper.style.height = height + 'px';
 
-    // Update the title to show current dimensions
     const gridTitle = document.getElementById('grid-title');
-    if (gridTitle) {
-        gridTitle.textContent = `The Canvas (${GRID_COLS}x${GRID_ROWS})`;
-    }
+    if (gridTitle) gridTitle.textContent = `The Canvas (${GRID_COLS}x${GRID_ROWS})`;
     
-    // Resize canvases (this automatically clears them)
     mapCanvas.width = width;
     mapCanvas.height = height;
     overlayCanvas.width = width;
     overlayCanvas.height = height;
     
-    // Set up text styling once
     ctx.font = '10px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Draw all tiles from data
     for (let r = 0; r < GRID_ROWS; r++) {
         for (let c = 0; c < GRID_COLS; c++) {
-            paintTile(r, c, mapGrid[r][c], false); 
+            const tile = mapGrid[r][c];
+            // paintTile now handles drawing the symbol AND the triangles
+            paintTile(r, c, tile, false); 
         }
     }
     
-    drawChunkBorders(); // Optional: Draw lines every 24 tiles
+    drawChunkBorders(); 
 }
 
 function drawChunkBorders() {
@@ -1906,19 +1956,23 @@ function resizeCanvas() {
                         const z = getZ(idString);
                         
                         // Initialize Layer if missing
-                        if (!layers[z]) {
-                            layers[z] = {
-                                grid: Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(DEFAULT_TILE)),
-                                monsters: [],
-                                items: [],
-                                placedItems: [],
-                                fillTer: "t_floor",
-                                omTerrain: idString
-                            };
-                        }
+if (!layers[z]) {
+    layers[z] = {
+        grid: Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(DEFAULT_TILE)),
+        monsters: [],
+        items: [],
+        placedItems: [],
+        fillTer: "t_floor",
+        omTerrain: idString,
+        paletteId: null,
+        paletteDefs: {},
+        customDefs: {}
+    };
+}
 
                         const layer = layers[z];
                         const content = obj.object || obj;
+                        currentZ = z;
                         
                         // Load Metadata
                         if (index === 0) {
@@ -1997,38 +2051,72 @@ function resizeCanvas() {
             const items = [];
             const placedItems = [];
 
-            const mons = contentObj.place_monsters || contentObj.monster || [];
-            mons.forEach(m => {
-                monsters.push({
-                    symbol: m.symbol || 'M', 
-                    id: m.monster || m.id,
-                    chance: m.chance || 10,
-                    x: m.x, y: m.y, repeat: m.repeat 
+            // 1. Safely Parse Monsters
+            const rawMons = contentObj.place_monsters || contentObj.monster || contentObj.monsters || [];
+            if (Array.isArray(rawMons)) {
+                rawMons.forEach(m => {
+                    monsters.push({
+                        symbol: m.symbol || 'M', 
+                        id: m.monster || m.id || m.group,
+                        chance: m.chance || 10,
+                        x: m.x, y: m.y, repeat: m.repeat 
+                    });
                 });
-            });
-
-            const itms = contentObj.items || [];
-            itms.forEach(i => {
-                items.push({
-                    symbol: i.symbol || 'i',
-                    group: i.item || i.group,
-                    chance: i.chance || 100,
-                    repeat: i.repeat
+            } else {
+                // Handle Object Dictionary: "monsters": { "M": { "monster": "mon_zombie" } }
+                Object.entries(rawMons).forEach(([sym, spawnList]) => {
+                    const spawns = Array.isArray(spawnList) ? spawnList : [spawnList];
+                    spawns.forEach(m => {
+                        monsters.push({
+                            symbol: sym, 
+                            id: m.monster || m.id || m.group,
+                            chance: m.chance || 10
+                        });
+                    });
                 });
-            });
+            }
 
+            // 2. Safely Parse Items
+            const rawItems = contentObj.items || [];
+            if (Array.isArray(rawItems)) {
+                rawItems.forEach(i => {
+                    items.push({
+                        symbol: i.symbol || 'i',
+                        group: i.item || i.group,
+                        chance: i.chance || 100,
+                        repeat: i.repeat
+                    });
+                });
+            } else {
+                // Handle Object Dictionary: "items": { "i": { "item": "rock" } }
+                Object.entries(rawItems).forEach(([sym, spawnList]) => {
+                    const spawns = Array.isArray(spawnList) ? spawnList : [spawnList];
+                    spawns.forEach(i => {
+                        items.push({
+                            symbol: sym,
+                            group: i.item || i.group,
+                            chance: i.chance || 100,
+                            repeat: i.repeat
+                        });
+                    });
+                });
+            }
+
+            // 3. Safely Parse Placed Items (Usually always an array)
             const placed = contentObj.place_items || contentObj.place_item || [];
-            placed.forEach(p => {
-                placedItems.push({
-                    item: p.item || p.group,
-                    chance: p.chance || 100,
-                    repeat: p.repeat,
-                    x: p.x, y: p.y
+            if (Array.isArray(placed)) {
+                placed.forEach(p => {
+                    placedItems.push({
+                        item: p.item || p.group,
+                        chance: p.chance || 100,
+                        repeat: p.repeat,
+                        x: p.x, y: p.y
+                    });
                 });
-            });
+            }
             return { monsters, items, placedItems };
         }
-
+        
         function loadSingleMapgen(mapgenObject) {
             let contentObj = mapgenObject.object || mapgenObject; 
             if (!contentObj.rows) throw new Error("Mapgen object missing 'rows'.");
@@ -2155,35 +2243,60 @@ btnSetFloor.addEventListener('click', () => {
                 return val + offset;
             };
 
-            const mons = contentObj.place_monsters || contentObj.monster || [];
-            mons.forEach(m => {
-                monsterSpawns.push({
-                    symbol: m.symbol || 'M', 
-                    id: m.monster || m.id,
-                    chance: m.chance || 10,
+            // Safely Parse Monsters
+            const rawMons = contentObj.place_monsters || contentObj.monster || contentObj.monsters || [];
+            if (Array.isArray(rawMons)) {
+                rawMons.forEach(m => {
+                    monsterSpawns.push({
+                        symbol: m.symbol || 'M', 
+                        id: m.monster || m.id || m.group,
+                        chance: m.chance || 10,
+                        x: m.x !== undefined ? shiftCoord(m.x, offX) : undefined,
+                        y: m.y !== undefined ? shiftCoord(m.y, offY) : undefined
+                    });
                 });
-            });
-
-            const items = contentObj.items || [];
-            items.forEach(i => {
-                itemSpawns.push({
-                    symbol: i.symbol || 'i',
-                    group: i.item || i.group,
-                    chance: i.chance || 100,
-                    repeat: i.repeat
+            } else {
+                Object.entries(rawMons).forEach(([sym, spawnList]) => {
+                    const spawns = Array.isArray(spawnList) ? spawnList : [spawnList];
+                    spawns.forEach(m => {
+                        monsterSpawns.push({ symbol: sym, id: m.monster || m.id || m.group, chance: m.chance || 10 });
+                    });
                 });
-            });
+            }
 
+            // Safely Parse Items
+            const rawItems = contentObj.items || [];
+            if (Array.isArray(rawItems)) {
+                rawItems.forEach(i => {
+                    itemSpawns.push({
+                        symbol: i.symbol || 'i',
+                        group: i.item || i.group,
+                        chance: i.chance || 100,
+                        repeat: i.repeat
+                    });
+                });
+            } else {
+                Object.entries(rawItems).forEach(([sym, spawnList]) => {
+                    const spawns = Array.isArray(spawnList) ? spawnList : [spawnList];
+                    spawns.forEach(i => {
+                        itemSpawns.push({ symbol: sym, group: i.item || i.group, chance: i.chance || 100, repeat: i.repeat });
+                    });
+                });
+            }
+
+            // Safely Parse Placed Items
             const placed = contentObj.place_items || contentObj.place_item || [];
-            placed.forEach(p => {
-                placeItemsSpawns.push({
-                    item: p.item || p.group,
-                    chance: p.chance || 100,
-                    repeat: p.repeat,
-                    x: shiftCoord(p.x, offX),
-                    y: shiftCoord(p.y, offY)
+            if (Array.isArray(placed)) {
+                placed.forEach(p => {
+                    placeItemsSpawns.push({
+                        item: p.item || p.group,
+                        chance: p.chance || 100,
+                        repeat: p.repeat,
+                        x: shiftCoord(p.x, offX),
+                        y: shiftCoord(p.y, offY)
+                    });
                 });
-            });
+            }
         }
         
         function refreshSpawnLists() {
@@ -2581,13 +2694,42 @@ function changeGridSize(inputId, delta) {
     const x = c * tileSize;
     const y = r * tileSize;
 
-    // Draw Background
+    // 1. Draw Background
     ctx.fillStyle = def.color;
     ctx.fillRect(x, y, tileSize, tileSize);
 
-    // Draw Character
+    // 2. Draw Character
     ctx.fillStyle = def.text;
     ctx.fillText(symbol, x + (tileSize / 2), y + (tileSize / 2));
+
+    // 3. Draw Indicators (Stamps on top of the fresh tile)
+    const triangleSize = 6; 
+
+const itemsHere = getSpawnsAt(placeItemsSpawns, r, c);
+const monstersHere = getSpawnsAt(monsterSpawns, r, c);
+
+    const hasVisibleItem = hasSpawnAt(placeItemsSpawns, r, c);
+    const hasVisibleMonster = hasSpawnAt(monsterSpawns, r, c);
+
+    if (showItemFlags && hasVisibleItem) {
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.moveTo(x, y + tileSize);                     
+        ctx.lineTo(x + 6, y + tileSize);      
+        ctx.lineTo(x, y + tileSize - 6);      
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    if (showMonsterFlags && hasVisibleMonster) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(x + tileSize, y + tileSize);          
+        ctx.lineTo(x + tileSize - 6, y + tileSize); 
+        ctx.lineTo(x + tileSize, y + tileSize - 6); 
+        ctx.closePath();
+        ctx.fill();
+    }
 }
         
 
@@ -2806,6 +2948,35 @@ function updateRoomPreview(endR, endC) {
             renderPalette(); 
             updateStatus('Selection pasted.', 'text-green-400');
         }
+       
+       // Reset Button Logic
+const btnResetHidden = document.getElementById('btn-reset-hidden');
+if (btnResetHidden) {
+    btnResetHidden.addEventListener('click', () => {
+        hiddenSpawnIds.clear();                  // Clear the memory
+        btnResetHidden.classList.add('hidden');  // Hide the button again
+        renderGrid();                            // Redraw the map
+        updateStatus("All hidden spawns are now visible.", "text-green-400");
+    });
+}
+       
+      
+        // Helper: Gets the universal ID string from any spawn object
+function getSpawnIdentifier(spawn) {
+    return spawn.id || spawn.monster || spawn.item || spawn.group;
+}
+
+// Helper: Returns all spawn objects overlapping a specific coordinate
+function getSpawnsAt(spawnsArray, row, col) {
+    if (!spawnsArray || spawnsArray.length === 0) return [];
+    
+    return spawnsArray.filter(spawn => {
+        if (spawn.x === undefined || spawn.y === undefined) return false;
+        let inX = Array.isArray(spawn.x) ? (col >= spawn.x[0] && col <= spawn.x[1]) : (col === spawn.x);
+        let inY = Array.isArray(spawn.y) ? (row >= spawn.y[0] && row <= spawn.y[1]) : (row === spawn.y);
+        return inX && inY;
+    });
+}
 
         function getTileCoordinates(e) {
     // Support for touch or mouse
@@ -3019,48 +3190,72 @@ if (!clipboardGrid || isDragMode) copySelection(endR, endC);
             lastBrushStartCoords = null; 
         }
         
-        function renderSpawnItem(list, item, index, removeFn) {
-            const div = document.createElement('div');
-            div.className = 'spawn-item';
-            div.dataset.index = index;
-            
-            let detailsHtml = '';
-            if (item.symbol) detailsHtml += `<span class="text-yellow-300 font-extrabold">${item.symbol}</span>`;
-            if (item.id) detailsHtml += `<span>${item.id}</span>`;
-            if (item.item) detailsHtml += `<span>${item.item}</span>`;
-            if (item.group) detailsHtml += `<span>${item.group}</span>`;
-            if (item.chance) detailsHtml += `<span>Chance: ${item.chance}%</span>`;
-            if (item.repeat) detailsHtml += `<span>Repeat: ${JSON.stringify(item.repeat)}</span>`;
-            if (item.x) detailsHtml += `<span>X: ${JSON.stringify(item.x)}</span>`;
-            if (item.y) detailsHtml += `<span>Y: ${JSON.stringify(item.y)}</span>`;
+        function renderSpawnItem(list, item, index, removeFn, reRenderListFn) {
+    const div = document.createElement('div');
+    // Using Tailwind classes for a cleaner row container
+    div.className = 'spawn-item flex items-center justify-between p-2 mb-1 bg-gray-800 rounded shadow border border-gray-600';
+    div.dataset.index = index;
+    
+    let detailsHtml = '';
+    if (item.symbol) detailsHtml += `<span class="text-yellow-300 font-extrabold mr-2">${item.symbol}</span>`;
+    if (item.id) detailsHtml += `<span class="mr-2">${item.id}</span>`;
+    if (item.item) detailsHtml += `<span class="mr-2">${item.item}</span>`;
+    if (item.group) detailsHtml += `<span class="mr-2">${item.group}</span>`;
+    if (item.chance) detailsHtml += `<span class="text-gray-400 text-[10px] mr-2">(${item.chance}%)</span>`;
 
-            div.innerHTML = `<div class="spawn-item-details">${detailsHtml}</div>
-                             <button class="spawn-item-remove-btn" data-index="${index}">X</button>`;
-            
-            div.querySelector('.spawn-item-remove-btn').addEventListener('click', removeFn);
-            list.appendChild(div);
-        }
+    const isHidden = item.hidden;
+    const opacityClass = isHidden ? 'opacity-40 grayscale' : '';
+
+    // The new decently sized O / X button styles
+    const btnClass = isHidden
+        ? 'bg-red-800 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-bold border border-red-600'
+        : 'bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-xs font-bold shadow-md';
+    const btnText = isHidden ? 'X' : 'O';
+
+    div.innerHTML = `
+        <div class="spawn-item-details flex-grow text-xs truncate ${opacityClass}">${detailsHtml}</div>
+        <div class="flex items-center gap-2 shrink-0 ml-2">
+            <button class="spawn-item-vis-btn transition-colors ${btnClass}" title="Toggle Visibility">${btnText}</button>
+            <button class="spawn-item-remove-btn bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded text-xs font-bold" data-index="${index}">DEL</button>
+        </div>
+    `;
+    
+    // Wire up the Remove button
+    div.querySelector('.spawn-item-remove-btn').addEventListener('click', removeFn);
+    
+    // Wire up the Visibility Toggle button
+    div.querySelector('.spawn-item-vis-btn').addEventListener('click', () => {
+        item.hidden = !item.hidden; // Flip the state
+        reRenderListFn();           // Update the sidebar list to swap colors/text
+        renderGrid();               // Update the canvas to hide/show the triangles
+    });
+
+    list.appendChild(div);
+}
 
         function renderMonsterSpawnList() {
-            monsterSpawnList.innerHTML = '';
-            monsterSpawns.forEach((item, index) => {
-                renderSpawnItem(monsterSpawnList, item, index, handleRemoveSpawn('monster'));
-            });
-        }
-        
-        function renderItemSpawnList() {
-            itemSpawnList.innerHTML = '';
-            itemSpawns.forEach((item, index) => {
-                renderSpawnItem(itemSpawnList, item, index, handleRemoveSpawn('item'));
-            });
-        }
+    monsterSpawnList.innerHTML = '';
+    monsterSpawns.forEach((item, index) => {
+        // Pass renderMonsterSpawnList as the 5th argument
+        renderSpawnItem(monsterSpawnList, item, index, handleRemoveSpawn('monster'), renderMonsterSpawnList);
+    });
+}
 
-        function renderPlaceItemsSpawnList() {
-            placeItemsList.innerHTML = '';
-            placeItemsSpawns.forEach((item, index) => {
-                renderSpawnItem(placeItemsList, item, index, handleRemoveSpawn('place_items'));
-            });
-        }
+function renderItemSpawnList() {
+    itemSpawnList.innerHTML = '';
+    itemSpawns.forEach((item, index) => {
+        // Pass renderItemSpawnList as the 5th argument
+        renderSpawnItem(itemSpawnList, item, index, handleRemoveSpawn('item'), renderItemSpawnList);
+    });
+}
+
+function renderPlaceItemsSpawnList() {
+    placeItemsList.innerHTML = '';
+    placeItemsSpawns.forEach((item, index) => {
+        // Pass renderPlaceItemsSpawnList as the 5th argument
+        renderSpawnItem(placeItemsList, item, index, handleRemoveSpawn('place_items'), renderPlaceItemsSpawnList);
+    });
+}
         
         function handleRemoveSpawn(type) {
             return function(e) {
@@ -3089,6 +3284,7 @@ if (!clipboardGrid || isDragMode) copySelection(endR, endC);
                 renderFn();
                 updateStatus(`Removed spawn from ${type} list.`, 'text-blue-300');
             };
+            renderGrid();
         }
 
         function addMonsterSpawn() {
@@ -3106,6 +3302,7 @@ if (!clipboardGrid || isDragMode) copySelection(endR, endC);
             monsterSymbolInput.value = '';
             monsterIdInput.value = '';
             monsterChanceInput.value = '';
+            renderGrid();
         }
 
         function addItemSpawn() {
@@ -3150,6 +3347,7 @@ if (!clipboardGrid || isDragMode) copySelection(endR, endC);
             placeItemYInput.value = '';
             placeItemChanceInput.value = '';
             placeItemRepeatInput.value = '';
+            renderGrid();
         }
 
        // initializeGrid(24, 24, true);
@@ -3645,6 +3843,7 @@ document.getElementById('quick-add-confirm').addEventListener('click', () => {
     }
 
     document.getElementById('quick-add-panel').classList.add('hidden');
+    renderGrid();
     pendingQuickAdd = null;
 });
 
@@ -4163,6 +4362,27 @@ window.onclick = function(event) {
         modal.style.display = 'none';
     }
 }
+
+// Event listener for Items Flag Button
+itemFlagBtn.addEventListener('click', () => {
+    showItemFlags = !showItemFlags;
+    itemFlagBtn.textContent = `Items: ${showItemFlags ? 'ON' : 'OFF'}`;
+    itemFlagBtn.classList.toggle('bg-indigo-600', showItemFlags);
+    itemFlagBtn.classList.toggle('bg-gray-600', !showItemFlags);
+    
+    renderGrid(); 
+});
+
+// Event listener for Monsters Flag Button
+monsterFlagBtn.addEventListener('click', () => {
+    showMonsterFlags = !showMonsterFlags;
+    monsterFlagBtn.textContent = `Monsters: ${showMonsterFlags ? 'ON' : 'OFF'}`;
+    monsterFlagBtn.classList.toggle('bg-indigo-600', showMonsterFlags);
+    monsterFlagBtn.classList.toggle('bg-gray-600', !showMonsterFlags);
+
+    renderGrid(); 
+});
+
        
     </script>
 </body>
