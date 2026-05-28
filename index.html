@@ -26,7 +26,7 @@
     position: fixed;
     left: 0;
     top: 0;
-    height: 100vh;
+    height: 100dvh;
     width: 320px;
     background-color: #1f2937; /* Gray-800 */
     border-right: 2px solid #374151;
@@ -62,8 +62,9 @@
     flex-grow: 1;
     overflow-y: auto;
     padding: 1.5rem;
+    overscroll-behavior: contain; /* Prevents scroll from traveling to the main canvas background */
+    touch-action: pan-y; /* Forces Android to process vertical finger dragging inside this panel */
 }
-
 
 
         body {
@@ -638,6 +639,10 @@
                 <input type="text" id="add-brush-symbol-input" maxlength="1" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-gray-100 text-center font-mono" placeholder="e.g., Y">
                 <label for="add-brush-definition-input" class="block text-sm font-medium text-gray-300">Definition (t_ or f_):</label>
                 <input type="text" id="add-brush-definition-input" class="w-full p-2 rounded bg-gray-800 border border-gray-600 text-gray-100 font-mono" placeholder="e.g., t_dirt or f_table">
+                <label class="flex items-center text-gray-300 my-2">
+                <input type="checkbox" id="add-brush-fuzzy-checkbox" class="h-4 w-4 text-purple-500 rounded border-gray-500 focus:ring-purple-500">
+                  <span class="ml-2 text-sm font-bold text-purple-400">Make this a Fuzzy Brush</span>
+                </label>
                 <button id="add-brush-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">Add / Update</button>
             </div>
         </div>
@@ -723,7 +728,24 @@
     </div>
 </div>
 
+<div id="fuzzy-editor-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100]">
+    <div class="bg-gray-800 p-5 rounded-xl shadow-2xl w-96 border border-purple-500">
+        <h3 class="text-lg font-extrabold text-white mb-2 border-b border-purple-500 pb-2">
+            Edit Fuzzy Brush: <span id="fuzzy-modal-symbol" class="text-purple-400 font-mono text-xl"></span>
+        </h3>
+        <p class="text-[10px] text-gray-400 mb-3 uppercase">Enter valid IDs (e.g. t_grass) and their weights.</p>
+        
+        <div id="fuzzy-rows-container" class="space-y-2 mb-4 max-h-60 overflow-y-auto pr-2">
+            </div>
 
+        <button onclick="addFuzzyRow()" class="w-full bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-1 mb-4 rounded border border-gray-500 transition-colors">+ Add Slot (Max 7)</button>
+
+        <div class="space-y-2">
+            <button onclick="saveFuzzyBrush()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded shadow transition-colors">Save & Update Export Logic</button>
+            <button onclick="document.getElementById('fuzzy-editor-modal').classList.add('hidden')" class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-2 rounded shadow transition-colors">Cancel</button>
+        </div>
+    </div>
+</div>
     <script>
         // --- GLOBAL VARIABLES & CONFIGURATION ---
         let GRID_ROWS = 24; 
@@ -1074,16 +1096,11 @@ function getFriendlyName(definitionId) {
             'UNKNOWN': { color: '#f0f', name: 'Unknown', symbol: '?', text: '#fff', definition: 'unknown' }
         };
 
-        // --- NEW: PRESET DATA ---
-        const monsterPresets = [
-            { name: "Standard Zombie", id: "mon_zombie", chance: 100 },
-            { name: "Fat Zombie", id: "mon_zombie_fat", chance: 20 },
-            { name: "Skeleton", id: "mon_skeleton", chance: 10 },
-            { name: "Security Bot", id: "mon_secubot", chance: 15 },
-            { name: "Feral Human", id: "mon_feral_human", chance: 10 },
-            { name: "Wild Dog", id: "mon_dog", chance: 5 }
-        ];
-       
+        
+       window.addEventListener('DOMContentLoaded', () => {
+    fetchAllMonsters(); 
+    fetchAllItemGroups();
+});
        
         
 
@@ -1135,7 +1152,7 @@ async function fetchAllItemGroups() {
             }
         }
 
-        renderPresetDropdown();
+        renderItemPresetDropdown();
         updateStatus(`Imported ${itemPresets.length} groups from experimental branch.`, "text-green-400");
 
     } catch (err) {
@@ -1144,7 +1161,87 @@ async function fetchAllItemGroups() {
     }
 }
 
-function renderPresetDropdown() {
+// 1. Create a global object to hold the full monster data
+let fetchedMonsterGroups = {}; 
+
+// 2. Clear out the preset array and leave it empty
+const monsterPresets = []; 
+
+async function fetchAllMonsters() {
+    const owner = "cataclysmbn"; 
+    const repo = "Cataclysm-BN"; 
+
+    try {
+        updateStatus("Scanning branch for monsters and groups...", "text-blue-400");
+
+        const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`;
+        
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error("Branch not found or API limit reached");
+        
+        const result = await response.json();
+
+        for (const leaf of result.tree) {
+            const pathLower = leaf.path.toLowerCase();
+            
+            // Checks for files inside data/json/monsters OR data/json/monstergroup
+            if ((pathLower.includes("data/json/monsters") || pathLower.includes("data/json/monstergroup")) && pathLower.endsWith(".json")) {
+                
+                const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${leaf.path}`;
+                
+                const fileResponse = await fetch(rawUrl);
+                if (!fileResponse.ok) continue;
+                
+                const data = await fileResponse.json();
+                const groups = Array.isArray(data) ? data : [data];
+
+                groups.forEach(group => {
+                    // 1. Standard Monsters
+                    if (group.type === "MONSTER" && group.id) {
+                        let monsterName = group.id; 
+                        if (group.name && typeof group.name === "object" && group.name.str) {
+                            monsterName = group.name.str;
+                        } else if (typeof group.name === "string") {
+                            monsterName = group.name;
+                        }
+
+                        fetchedMonsterGroups[group.id] = group;
+                        
+                        monsterPresets.push({
+                            id: group.id,
+                            name: monsterName,
+                            chance: 100,
+                            repeat: "1"
+                        });
+                    } 
+                    // 2. Monster Groups
+                    else if (group.type === "monstergroup" && (group.name || group.id)) {
+                        let groupId = group.name || group.id;
+                        
+                        fetchedMonsterGroups[groupId] = group; // Share the cache so we can check type later
+                        
+                        monsterPresets.push({
+                            id: groupId,
+                            name: `[GROUP] ${groupId}`, // Adds a visual tag in the dropdown
+                            chance: 100,
+                            repeat: "1"
+                        });
+                    }
+                });
+            }
+        }
+
+        renderMonsterPresetDropdown(); 
+        updateStatus(`Imported ${monsterPresets.length} monsters & groups.`, "text-green-400");
+
+    } catch (err) {
+        console.error(err);
+        updateStatus("Import failed. Check repo name and branch.", "text-red-400");
+    }
+}
+
+// --- ITEM DROPDOWN RENDERER ---
+function renderItemPresetDropdown() {
     itemPresetSelect.innerHTML = '<option value="">-- Load Preset (Optional) --</option>';
     const placeItemPresetSelect = document.getElementById('place-item-preset-select');
     if (placeItemPresetSelect) placeItemPresetSelect.innerHTML = '<option value="">-- Load Preset (Optional) --</option>';
@@ -1162,15 +1259,29 @@ function renderPresetDropdown() {
     });
 }
 
+// --- MONSTER DROPDOWN RENDERER ---
+function renderMonsterPresetDropdown() {
+    // Target your monster HTML dropdown element
+    monsterPresetSelect.innerHTML = '<option value="">-- Load Preset (Optional) --</option>';
+
+    monsterPresets.forEach(preset => {
+        const opt = document.createElement('option');
+        // This stringifies the whole preset (id, name, chance, etc.) so the listener can parse it
+        opt.value = JSON.stringify(preset); 
+        opt.textContent = `${preset.name} (${preset.id})`; // Shows "chicken (mon_chicken)" in the UI
+        monsterPresetSelect.appendChild(opt);
+    });
+}
+
         // --- PRESET LISTENERS ---
         monsterPresetSelect.addEventListener('change', (e) => {
-            if (!e.target.value) return;
-            const data = JSON.parse(e.target.value);
-            monsterIdInput.value = data.id;
-            monsterChanceInput.value = data.chance;
-            if(monsterSymbolInput.value === '') monsterSymbolInput.value = 'M';
-            updateStatus(`Loaded preset: ${data.name}. You can still edit values.`, 'text-blue-300');
-        });
+    if (!e.target.value) return;
+    const data = JSON.parse(e.target.value); // Unpacks the monster object
+    monsterIdInput.value = data.id;           // Correctly populates 'mon_chicken'
+    monsterChanceInput.value = data.chance;   // Populates 100
+    if(monsterSymbolInput.value === '') monsterSymbolInput.value = 'M';
+    updateStatus(`Loaded preset: ${data.name}. You can still edit values.`, 'text-blue-300');
+});
 
         // --- NEW HELPERS FOR NESTED ITEM GROUPS (Moved to Global Scope) ---
 function getEntryDisplayName(entry) {
@@ -1461,14 +1572,22 @@ function drawChunkBorders() {
                 if (e.type === 'mousedown' && e.button !== 0) return;
                 longPressTimer = setTimeout(() => {
     // Open our new custom editor instead of just the color picker
-    openBrushEditor(symbol);
+    if (def.isFuzzy) {
+        openFuzzyEditor(symbol);
+    } else {
+        openBrushEditor(symbol);
+    };
     if(navigator.vibrate) navigator.vibrate(50);
 }, LONG_PRESS_DURATION);
 
-// Also add a right-click handler for desktop convenience
+// Branch the context menu based on fuzzy status
 item.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    openBrushEditor(symbol);
+    if (def.isFuzzy) {
+        openFuzzyEditor(symbol);
+    } else {
+        openBrushEditor(symbol);
+    }
 });
             };
 
@@ -1549,13 +1668,16 @@ function clearRoomVisuals() { clearOverlay(); }
                 return;
             }
 
+            const isFuzzy = document.getElementById('add-brush-fuzzy-checkbox').checked;
             const newDef = {
-        color: '#8b5cf6', 
-        name: definition.replace(/t_|f_/, '').replace(/_/g, ' '),
-        symbol: symbol,
-        text: '#fff',
-        definition: definition
-    };
+                color: isFuzzy ? '#d946ef' : '#8b5cf6', // Pinkish for fuzzy, purple for normal
+                name: isFuzzy ? `Fuzzy [${symbol}]` : definition.replace(/t_|f_/, '').replace(/_/g, ' '),
+                symbol: symbol,
+                text: '#fff',
+                definition: definition,
+                isFuzzy: isFuzzy,
+                fuzzyData: isFuzzy ? [{ id: definition, weight: 1 }] : null // Default fuzzy recipe
+            };
     addCustomBrush(symbol, definition, false);
    
    layers[currentZ].customDefs[symbol] = newDef;
@@ -3162,33 +3284,41 @@ function renderPlaceItemsSpawnList() {
         }
 
         function addMonsterSpawn() {
-            const symbol = document.getElementById('monster-symbol-input').value.trim();
-            const id = document.getElementById('monster-id-input').value.trim();
-            const chance = parseInt(document.getElementById('monster-chance-input').value, 10);
-            const x = parseCoordInput(document.getElementById('monster-x-input').value);
-            const y = parseCoordInput(document.getElementById('monster-y-input').value);
+    const symbol = document.getElementById('monster-symbol-input').value.trim();
+    const id = document.getElementById('monster-id-input').value.trim();
+    const chance = parseInt(document.getElementById('monster-chance-input').value, 10);
+    const x = parseCoordInput(document.getElementById('monster-x-input').value);
+    const y = parseCoordInput(document.getElementById('monster-y-input').value);
 
-            if (!id || isNaN(chance) || chance < 1) {
-                updateStatus("Monster: ID and Chance (> 0) are required.", 'text-red-400');
-                return;
-            }
+    if (!id || isNaN(chance) || chance < 1) {
+        updateStatus("Monster: ID and Chance (> 0) are required.", 'text-red-400');
+        return;
+    }
 
-            const newSpawn = { chance };
-            // Ensure ID property defaults to 'monster' if zoned (as per CDDA schema usually), but fallback nicely
-            newSpawn.id = id; 
-            
-            if (symbol) newSpawn.symbol = symbol;
-            if (x !== null) newSpawn.x = x;
-            if (y !== null) newSpawn.y = y;
+    const newSpawn = { chance };
+    
+    // --- NEW LOGIC: Determine if this is a group or a specific monster ---
+    // Checks our fetched GitHub cache OR falls back to checking if it starts with "GROUP_"
+    const isGroup = (fetchedMonsterGroups[id] && fetchedMonsterGroups[id].type === "monstergroup") || id.startsWith("GROUP_");
 
-            monsterSpawns.push(newSpawn);
-            renderMonsterSpawnList();
-            updateStatus(`Monster spawn '${id}' added to list.`, 'text-green-400');
-            
-            document.getElementById('monster-symbol-input').value = '';
-            document.getElementById('monster-id-input').value = '';
-            renderGrid();
-        }
+    if (isGroup) {
+        newSpawn.group = id;
+    } else {
+        newSpawn.monster = id;
+    }
+    
+    if (symbol) newSpawn.symbol = symbol;
+    if (x !== null) newSpawn.x = x;
+    if (y !== null) newSpawn.y = y;
+
+    monsterSpawns.push(newSpawn);
+    renderMonsterSpawnList();
+    updateStatus(`Spawn '${id}' added to list.`, 'text-green-400');
+    
+    document.getElementById('monster-symbol-input').value = '';
+    document.getElementById('monster-id-input').value = '';
+    renderGrid();
+}
 
         function addItemSpawn() {
             const symbol = itemSymbolInput.value.trim();
@@ -3960,7 +4090,7 @@ function downloadExport() {
         // Only attach these fields if they actually contain data
         if (Object.keys(defs.terrain).length > 0) mapgenPayload.terrain = defs.terrain;
 if (Object.keys(defs.furniture).length > 0) mapgenPayload.furniture = defs.furniture;
-        if (l.monsters && l.monsters.length > 0) mapgenPayload.place_monsters = l.monsters;
+        if (l.monsters && l.monsters.length > 0) mapgenPayload.place_monster = l.monsters;
         if (l.items && l.items.length > 0) mapgenPayload.items = l.items;
         if (l.placedItems && l.placedItems.length > 0) mapgenPayload.place_items = l.placedItems;
 
@@ -4204,6 +4334,104 @@ monsterFlagBtn.addEventListener('click', () => {
 
     renderGrid(); 
 });
+
+// --- FUZZY BRUSH LOGIC ---
+let currentEditingFuzzySymbol = null;
+
+function openFuzzyEditor(symbol) {
+    const def = tileDefinitions[symbol];
+    if (!def || !def.isFuzzy) return;
+    currentEditingFuzzySymbol = symbol;
+    
+    document.getElementById('fuzzy-modal-symbol').textContent = symbol;
+    const container = document.getElementById('fuzzy-rows-container');
+    container.innerHTML = ''; // Clear old rows
+    
+    // Ensure fuzzyData exists
+    if (!def.fuzzyData) def.fuzzyData = [{id: def.definition, weight: 1}];
+    
+    def.fuzzyData.forEach((item, index) => addFuzzyRow(item.id, item.weight));
+    document.getElementById('fuzzy-editor-modal').classList.remove('hidden');
+    updateFuzzyPercentages();
+}
+
+function addFuzzyRow(id = "", weight = 1) {
+    const container = document.getElementById('fuzzy-rows-container');
+    if (container.children.length >= 7) return; // Max 7 slots
+
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 fuzzy-row';
+    row.innerHTML = `
+        <input type="text" class="fuzzy-id flex-grow p-1 rounded bg-gray-900 border border-purple-600 text-white text-xs font-mono" placeholder="t_id" value="${id}">
+        <input type="number" class="fuzzy-weight w-12 p-1 rounded bg-gray-900 border border-purple-600 text-white text-xs text-center" value="${weight}" min="1" onchange="updateFuzzyPercentages()">
+        <span class="fuzzy-percent w-10 text-[10px] text-purple-300 font-bold text-right"></span>
+        <button onclick="this.parentElement.remove(); updateFuzzyPercentages();" class="text-red-500 hover:text-red-400 text-xs font-bold px-1">X</button>
+    `;
+    container.appendChild(row);
+    updateFuzzyPercentages();
+}
+
+function updateFuzzyPercentages() {
+    const rows = document.querySelectorAll('.fuzzy-row');
+    let totalWeight = 0;
+    rows.forEach(row => totalWeight += parseInt(row.querySelector('.fuzzy-weight').value || 1, 10));
+    
+    rows.forEach(row => {
+        const w = parseInt(row.querySelector('.fuzzy-weight').value || 1, 10);
+        const pct = totalWeight > 0 ? Math.round((w / totalWeight) * 100) : 0;
+        row.querySelector('.fuzzy-percent').textContent = pct + '%';
+    });
+}
+
+function saveFuzzyBrush() {
+    if (!currentEditingFuzzySymbol) return;
+    
+    const rows = document.querySelectorAll('.fuzzy-row');
+    const newData = [];
+    
+    rows.forEach(row => {
+        const id = row.querySelector('.fuzzy-id').value.trim();
+        const weight = parseInt(row.querySelector('.fuzzy-weight').value || 1, 10);
+        if (id) newData.push({ id, weight });
+    });
+
+    if (newData.length === 0) {
+        alert("Fuzzy brush must have at least one valid ID.");
+        return;
+    }
+
+    // Save to the global definition
+    tileDefinitions[currentEditingFuzzySymbol].fuzzyData = newData;
+    layers[currentZ].customDefs[currentEditingFuzzySymbol] = tileDefinitions[currentEditingFuzzySymbol];
+    
+    document.getElementById('fuzzy-editor-modal').classList.add('hidden');
+    updateStatus(`Updated fuzzy recipe for '${currentEditingFuzzySymbol}'`, "text-purple-400");
+}
+
+// --- OVERRIDE EXPORT DEFINITION GENERATOR ---
+// This safely hijacks your existing export logic to spit out the weighted arrays
+const originalGetLayerDefinitions = getLayerDefinitions;
+getLayerDefinitions = function(gridData, layer) {
+    const defs = originalGetLayerDefinitions(gridData, layer); // Get standard output
+    const allBrushes = { ...MASTER_TILE_DEFINITIONS, ...layer.paletteDefs, ...layer.customDefs };
+    
+    // Inject Fuzzy formatting
+    const usedSymbols = new Set(gridData.flat());
+    usedSymbols.forEach(symbol => {
+        const def = allBrushes[symbol];
+        if (def && def.isFuzzy && def.fuzzyData) {
+            const formattedArray = def.fuzzyData.map(item => {
+                // If weight is exactly 1, CDDA allows just the string "t_id". Otherwise ["t_id", weight]
+                return item.weight === 1 ? item.id : [item.id, item.weight];
+            });
+            
+            // Assume terrain for fuzzy arrays for now, as furniture is rarely weighted like this natively
+            defs.terrain[symbol] = formattedArray; 
+        }
+    });
+    
+    return defs;
+};
 
        
     </script>
